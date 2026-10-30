@@ -816,55 +816,40 @@
 // INTEGRASI GEMINI AI (STABLE V1 GEMINI-1.5-FLASH)
     async function getElysiaAiAdvice(index) {
       const task = tasks[index];
-      let apiKey = localStorage.getItem('elysiaGeminiApiKey');
-
-      if (!apiKey || !apiKey.trim()) {
-        alert("Silakan masukkan Gemini API Key kamu terlebih dahulu di tab '⚙️ Pengaturan AI'!");
-        switchMainTab('settings', document.querySelectorAll('.nav-btn')[2]);
-        return;
-      }
-
-      apiKey = apiKey.trim();
-
       const courseObj = courses.find(c => c.id === task.courseId);
       const courseName = courseObj ? courseObj.name : 'Umum';
 
-      // Set Loading State (Mascot 1)
+      // Set Loading State
       document.getElementById('aiMascotImg').src = 'Elysia_saran1.jpg';
       document.getElementById('aiModalTaskTitle').textContent = `✨ Tips: ${task.text}`;
-      document.getElementById('aiBubbleContent').textContent = "Elysia sedang memikirkan strategi terbaik untukmu... Tunggu sebentar ya~♪ 🌸";
+      document.getElementById('aiBubbleContent').textContent = "Elysia sedang merumuskan strategi terbaik untukmu... Tunggu sebentar ya~♪ 🌸";
       document.getElementById('aiModal').classList.add('active');
 
       const promptText = `Kamu adalah Elysia ("Miss Pink Elf♪") dari Honkai Impact 3rd yang ramah, ceria, dan penuh semangat. Berikan 3 poin strategi belajar/langkah praktis pengerjaan yang singkat dan efektif untuk tugas berikut:\n\nTugas: ${task.text}\nMata Kuliah: ${courseName}\nJenis Tugas: ${task.category || 'Umum'}\nCatatan: ${task.notes || '-'}\n\nGunakan gaya bicara khas Elysia (panggil dengan 'Hi~♪' atau 'Yahoo~♪', pakai emoji 🌸💖✨). Jawab dalam format poin ringkas.`;
 
-      // Menggunakan endpoint v1 resmi dengan model gemini-1.5-flash
-      const url = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+      // ➔ GANTI URL DI BAWAH INI DENGAN URL WORKER CLOUDFLARE MILIKMU SENDIRI
+      const workerUrl = 'https://elysia-ai-proxy.namakamu.workers.dev';
 
       try {
-        const response = await fetch(url, {
+        const response = await fetch(workerUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: promptText }] }]
-          })
+          body: JSON.stringify({ prompt: promptText })
         });
 
         const data = await response.json();
 
         if (response.ok && data.candidates && data.candidates[0] && data.candidates[0].content.parts[0].text) {
           const reply = data.candidates[0].content.parts[0].text;
-          
-          // Switch Mascot berdasarkan urgensi
           const isUrgent = task.category === '🚀 Project' || (task.deadline && (new Date(task.deadline) - new Date()) < 86400000);
           document.getElementById('aiMascotImg').src = isUrgent ? 'Elysia_saran3.jpg' : 'Elysia_saran2.jpg';
-          
           document.getElementById('aiBubbleContent').innerHTML = reply.replace(/\n/g, '<br>');
         } else {
           const errMsg = (data.error && data.error.message) ? data.error.message : JSON.stringify(data);
-          document.getElementById('aiBubbleContent').innerHTML = `Aduh, maaf ya~ Google menolak permintaan ini.<br><br><small style="color:var(--red);"><b>Pesan:</b> ${errMsg}</small>`;
+          document.getElementById('aiBubbleContent').innerHTML = `Aduh, maaf ya~ Ada kendala dari server AI.<br><small style="color:var(--red);">${errMsg}</small>`;
         }
       } catch (err) {
-        document.getElementById('aiBubbleContent').innerHTML = `Aduh, maaf ya~ Gagal terhubung ke jaringan.<br><br><small style="color:var(--red);"><b>Error:</b> ${err.message || err}</small>`;
+        document.getElementById('aiBubbleContent').innerHTML = `Gagal terhubung ke Cloudflare Worker. Pastikan URL worker sudah benar! ✨`;
       }
     }
     // PEMANTAU JADWAL AUTOMATIS (06:00 & 20:00 & DEADLINE)
