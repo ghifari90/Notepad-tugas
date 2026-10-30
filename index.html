@@ -813,7 +813,7 @@
       saveData(); renderTasks(); closeEditTaskModal(); playCheckSound();
     }
 
-    // INTEGRASI GEMINI AI (SOLUSI NETWORK & DETAIL ERROR DETECTOR)
+// INTEGRASI GEMINI AI (STABLE V1 GEMINI-1.5-FLASH)
     async function getElysiaAiAdvice(index) {
       const task = tasks[index];
       let apiKey = localStorage.getItem('elysiaGeminiApiKey');
@@ -824,12 +824,12 @@
         return;
       }
 
-      apiKey = apiKey.trim(); // Bersihkan dari spasi tersembunyi
+      apiKey = apiKey.trim();
 
       const courseObj = courses.find(c => c.id === task.courseId);
       const courseName = courseObj ? courseObj.name : 'Umum';
 
-      // Set Loading State
+      // Set Loading State (Mascot 1)
       document.getElementById('aiMascotImg').src = 'Elysia_saran1.jpg';
       document.getElementById('aiModalTaskTitle').textContent = `✨ Tips: ${task.text}`;
       document.getElementById('aiBubbleContent').textContent = "Elysia sedang memikirkan strategi terbaik untukmu... Tunggu sebentar ya~♪ 🌸";
@@ -837,7 +837,8 @@
 
       const promptText = `Kamu adalah Elysia ("Miss Pink Elf♪") dari Honkai Impact 3rd yang ramah, ceria, dan penuh semangat. Berikan 3 poin strategi belajar/langkah praktis pengerjaan yang singkat dan efektif untuk tugas berikut:\n\nTugas: ${task.text}\nMata Kuliah: ${courseName}\nJenis Tugas: ${task.category || 'Umum'}\nCatatan: ${task.notes || '-'}\n\nGunakan gaya bicara khas Elysia (panggil dengan 'Hi~♪' atau 'Yahoo~♪', pakai emoji 🌸💖✨). Jawab dalam format poin ringkas.`;
 
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+      // Menggunakan endpoint v1 resmi dengan model gemini-1.5-flash
+      const url = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
 
       try {
         const response = await fetch(url, {
@@ -853,19 +854,17 @@
         if (response.ok && data.candidates && data.candidates[0] && data.candidates[0].content.parts[0].text) {
           const reply = data.candidates[0].content.parts[0].text;
           
+          // Switch Mascot berdasarkan urgensi
           const isUrgent = task.category === '🚀 Project' || (task.deadline && (new Date(task.deadline) - new Date()) < 86400000);
           document.getElementById('aiMascotImg').src = isUrgent ? 'Elysia_saran3.jpg' : 'Elysia_saran2.jpg';
           
           document.getElementById('aiBubbleContent').innerHTML = reply.replace(/\n/g, '<br>');
         } else {
-          // Tampilkan pesan error resmi dari respons JSON Google
           const errMsg = (data.error && data.error.message) ? data.error.message : JSON.stringify(data);
-          document.getElementById('aiBubbleContent').innerHTML = `Aduh, maaf ya~ Google menolak permintaan ini.<br><br><small style="color:var(--red);"><b>Pesan dari Google:</b> ${errMsg}</small>`;
+          document.getElementById('aiBubbleContent').innerHTML = `Aduh, maaf ya~ Google menolak permintaan ini.<br><br><small style="color:var(--red);"><b>Pesan:</b> ${errMsg}</small>`;
         }
       } catch (err) {
-        // Tangkap error koneksi/CORS/VPN/AdBlocker
-        console.error("Detail Fetch Error:", err);
-        document.getElementById('aiBubbleContent').innerHTML = `Aduh, maaf ya~ Koneksi ke API terputus.<br><br><small style="color:var(--red);"><b>Detail Kendala Jaringan:</b> ${err.message || err}</small><br><br><small style="color:var(--text-muted);">Tips: Pastikan AdBlocker/VPN dimatikan, dan API Key sudah benar ya! 🌸</small>`;
+        document.getElementById('aiBubbleContent').innerHTML = `Aduh, maaf ya~ Gagal terhubung ke jaringan.<br><br><small style="color:var(--red);"><b>Error:</b> ${err.message || err}</small>`;
       }
     }
     // PEMANTAU JADWAL AUTOMATIS (06:00 & 20:00 & DEADLINE)
