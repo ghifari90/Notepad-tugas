@@ -813,16 +813,18 @@
       saveData(); renderTasks(); closeEditTaskModal(); playCheckSound();
     }
 
-    // INTEGRASI GEMINI AI (V1 STABLE ENDPOINT & DIRECT ERROR LOG)
+    // INTEGRASI GEMINI AI (SOLUSI NETWORK & DETAIL ERROR DETECTOR)
     async function getElysiaAiAdvice(index) {
       const task = tasks[index];
-      const apiKey = localStorage.getItem('elysiaGeminiApiKey');
+      let apiKey = localStorage.getItem('elysiaGeminiApiKey');
 
-      if (!apiKey) {
+      if (!apiKey || !apiKey.trim()) {
         alert("Silakan masukkan Gemini API Key kamu terlebih dahulu di tab '⚙️ Pengaturan AI'!");
         switchMainTab('settings', document.querySelectorAll('.nav-btn')[2]);
         return;
       }
+
+      apiKey = apiKey.trim(); // Bersihkan dari spasi tersembunyi
 
       const courseObj = courses.find(c => c.id === task.courseId);
       const courseName = courseObj ? courseObj.name : 'Umum';
@@ -835,53 +837,37 @@
 
       const promptText = `Kamu adalah Elysia ("Miss Pink Elf♪") dari Honkai Impact 3rd yang ramah, ceria, dan penuh semangat. Berikan 3 poin strategi belajar/langkah praktis pengerjaan yang singkat dan efektif untuk tugas berikut:\n\nTugas: ${task.text}\nMata Kuliah: ${courseName}\nJenis Tugas: ${task.category || 'Umum'}\nCatatan: ${task.notes || '-'}\n\nGunakan gaya bicara khas Elysia (panggil dengan 'Hi~♪' atau 'Yahoo~♪', pakai emoji 🌸💖✨). Jawab dalam format poin ringkas.`;
 
-      // Daftar kombinasi URL Endpoint resmi dari Google
-      const endpoints = [
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
-        `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${apiKey}`
-      ];
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
 
-      let lastErrorDetail = '';
+      try {
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: promptText }] }]
+          })
+        });
 
-      for (const url of endpoints) {
-        try {
-          const response = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ contents: [{ parts: [{ text: promptText }] }] })
-          });
+        const data = await response.json();
 
-          const data = await response.json();
-
-          if (response.ok && data.candidates && data.candidates[0] && data.candidates[0].content.parts[0].text) {
-            const reply = data.candidates[0].content.parts[0].text;
-            
-            const isUrgent = task.category === '🚀 Project' || (task.deadline && (new Date(task.deadline) - new Date()) < 86400000);
-            document.getElementById('aiMascotImg').src = isUrgent ? 'Elysia_saran3.jpg' : 'Elysia_saran2.jpg';
-            
-            document.getElementById('aiBubbleContent').innerHTML = reply.replace(/\n/g, '<br>');
-            return; // Berhasil!
-          } else if (data.error) {
-            lastErrorDetail = data.error.message || JSON.stringify(data.error);
-          }
-        } catch (e) {
-          lastErrorDetail = e.message;
+        if (response.ok && data.candidates && data.candidates[0] && data.candidates[0].content.parts[0].text) {
+          const reply = data.candidates[0].content.parts[0].text;
+          
+          const isUrgent = task.category === '🚀 Project' || (task.deadline && (new Date(task.deadline) - new Date()) < 86400000);
+          document.getElementById('aiMascotImg').src = isUrgent ? 'Elysia_saran3.jpg' : 'Elysia_saran2.jpg';
+          
+          document.getElementById('aiBubbleContent').innerHTML = reply.replace(/\n/g, '<br>');
+        } else {
+          // Tampilkan pesan error resmi dari respons JSON Google
+          const errMsg = (data.error && data.error.message) ? data.error.message : JSON.stringify(data);
+          document.getElementById('aiBubbleContent').innerHTML = `Aduh, maaf ya~ Google menolak permintaan ini.<br><br><small style="color:var(--red);"><b>Pesan dari Google:</b> ${errMsg}</small>`;
         }
+      } catch (err) {
+        // Tangkap error koneksi/CORS/VPN/AdBlocker
+        console.error("Detail Fetch Error:", err);
+        document.getElementById('aiBubbleContent').innerHTML = `Aduh, maaf ya~ Koneksi ke API terputus.<br><br><small style="color:var(--red);"><b>Detail Kendala Jaringan:</b> ${err.message || err}</small><br><br><small style="color:var(--text-muted);">Tips: Pastikan AdBlocker/VPN dimatikan, dan API Key sudah benar ya! 🌸</small>`;
       }
-
-      // Jika semua endpoint gagal, tampilkan alasan persisnya di dialog
-      document.getElementById('aiBubbleContent').innerHTML = `Aduh, maaf ya~ Elysia gagal terhubung.<br><br><small style="color:var(--red);"><b>Detail Error:</b> ${lastErrorDetail}</small><br><br>Coba buat API Key baru di Google AI Studio dengan opsi <i>"Create API key in new project"</i> ya! 🌸`;
     }
-
-    function closeAiModal() { 
-      document.getElementById('aiModal').classList.remove('active'); 
-    }
-    
-    function closeAiModalOnOverlay(e) {
-      if (e.target.id === 'aiModal') closeAiModal();
-    }
-
     // PEMANTAU JADWAL AUTOMATIS (06:00 & 20:00 & DEADLINE)
     function triggerMorningSummary() {
       const active = tasks.filter(t => !t.completed);
